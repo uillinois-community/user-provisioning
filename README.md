@@ -4,8 +4,9 @@ Documentation, scripts, and related information regarding user provisioning in G
 ## Scripts
 **github_invite.pl** is a simple perl script that invites users to an organization using the GitHub API and a personal access token
 
->example command:  
+>example commands:  
 >github_invite.pl -user=clhawk -token=SECRET_TOKEN -email=c_l_hawk@yahoo.com -org_name=UOFITestOrg1  
+>github_invite.pl -user=clhawk -token=SECRET_TOKEN -file=invitations.csv  
 >
 >The **-role** parameter is optional with inputs of either admin (owner) or direct_member (member).  This defaults to direct_member if unspecified.
 >
