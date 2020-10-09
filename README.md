@@ -9,6 +9,8 @@ Documentation, scripts, and related information regarding user provisioning in G
 >
 >The **-role** parameter is optional with inputs of either admin (owner) or direct_member (member).  This defaults to direct_member if unspecified.
 >
+>Alternatively, the **-file** parameter can be given with a comma separated file of invitations to send out.  This file would need to be in the format of *email,org_name,role*  
+>
 >Basic API call:  
 >curl -u "*username*:*personal_token*" -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/orgs/ORG_NAME/invitations -d '{"email":*email*,"role":*role*}'
 >
