@@ -66,7 +66,11 @@ def get_json_from_response(r):
                 reason += ' (Check token)'
             raise Exception(f'Error. [Status: {status}] [Reason: {reason}] [Message: {message}]')
         if errors is not None:
-            raise Exception(f'Errors: {errors}')
+            tip = ''
+            for err in errors:
+                if 'type' in err and err['type'] == 'NOT_FOUND':
+                    tip += ' Check the spelling of the org.'
+            raise Exception(f'Errors: {errors}{tip}')
         return r_json
     except AttributeError:
         raise Exception('Expected Response object')
