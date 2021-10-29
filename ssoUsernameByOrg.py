@@ -67,9 +67,12 @@ def get_json_from_response(r):
             raise Exception(f'Error. [Status: {status}] [Reason: {reason}] [Message: {message}]')
         if errors is not None:
             tip = ''
-            for err in errors:
-                if 'type' in err and err['type'] == 'NOT_FOUND':
-                    tip += ' Check the spelling of the org.'
+            if isinstance(errors, list):
+                for err in errors:
+                    if not isinstance(err, dict):
+                        continue
+                    if 'type' in err and err['type'] == 'NOT_FOUND':
+                        tip += ' Check the spelling of the org.'
             raise Exception(f'Errors: {errors}{tip}')
         return r_json
     except AttributeError:
