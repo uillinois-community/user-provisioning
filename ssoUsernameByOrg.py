@@ -71,6 +71,10 @@ def get_json_from_response(r):
     except AttributeError:
         raise Exception('Expected Response object')
 
+# Please note that the 'first: 100' part should remain hard-coded
+# and should not be changed or parameterized. This script pulls
+# 100 results at a time (the most allowed) and cycles until it
+# retrieves everything possible.
 query = """
 query($organization: String!, $endCursor: String) {
   organization(login: $organization) {
