@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
 # Pre-reqs:
 #    pip3 install -r requirements.txt
@@ -9,7 +9,7 @@
 #
 # Set GITHUB_TOKEN environment variable (or .env file) to your personal access token
 #
-from github import Github
+
 import requests
 import json
 import argparse
@@ -23,16 +23,71 @@ arg_parser.add_argument('org')
 args = arg_parser.parse_args()
 
 load_dotenv()
-token = os.getenv('GITHUB_TOKEN', '...')
+token = os.getenv('GITHUB_TOKEN')
+if not token:
+    raise Exception('missing GITHUB_TOKEN env var (put in .env)')
 
-g = Github(token)
+# Unused
+# from github import Github
+# g = Github(token)
 
+def get_json_from_response(r):
+    try:
+        status = r.status_code
+        reason = None
+        message = None
+        errors = None
+        json_fail = False
+        try:
+            reason = r.reason
+        except:
+            reason = None
+        reason = reason or '(No reason given)'
+        try:
+            r_json = r.json()
+        except:
+            message = "(Can't decode json)"
+            r_json = None
+            json_fail = True
+        if r_json:
+            try:
+                message = r_json['message']
+            except:
+                message = None
+            try:
+                errors = r_json['errors']
+            except:
+                errors = None
+        message = message or '(No message given)'
+        if status != 200 or json_fail:
+            if status in [404, 405]:
+                reason += ' (GitHub API URL might be wrong)'
+            if status == 401:
+                reason += ' (Check token)'
+            raise Exception(f'Error. [Status: {status}] [Reason: {reason}] [Message: {message}]')
+        if errors is not None:
+            tip = ''
+            if isinstance(errors, list):
+                for err in errors:
+                    if not isinstance(err, dict):
+                        continue
+                    if 'type' in err and err['type'] == 'NOT_FOUND':
+                        tip += ' Check the spelling of the org.'
+            raise Exception(f'Errors: {errors}{tip}')
+        return r_json
+    except AttributeError:
+        raise Exception('Expected Response object')
+
+# Please note that the 'first: 100' part should remain hard-coded
+# and should not be changed or parameterized. This script pulls
+# 100 results at a time (the most allowed) and cycles until it
+# retrieves everything possible.
 query = """
-query($organization: String!) {
+query($organization: String!, $endCursor: String) {
   organization(login: $organization) {
     samlIdentityProvider {
       ssoUrl,
-      externalIdentities(first: 100) {
+      externalIdentities(first: 100, after: $endCursor) {
         edges {
           node {
             guid,
@@ -44,6 +99,10 @@ query($organization: String!) {
             }
           }
         }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
       }
     }
   }
@@ -51,20 +110,34 @@ query($organization: String!) {
 
 variables = {
     'organization': args.org,
+    'endCursor': None,
 }
 
 headers = {
     'authorization': 'bearer ' + token,
-    'content-type': 'application/json'
+    'content-type': 'application/json',
+    'accept-encoding': 'gzip',
 }
 
-r = requests.post('https://api.github.com/graphql',
+hasNextPage = True
+while hasNextPage:
+    r = requests.post('https://api.github.com/graphql',
         json={'query': query, 'variables': variables}, headers=headers)
-#pprint(r.json())
-
-out_j = r.json()
-
-for node in out_j["data"]["organization"]["samlIdentityProvider"]["externalIdentities"]["edges"]:
-    username = node["node"]["user"]["login"]
-    samlId = node["node"]["samlIdentity"]["nameId"]
-    print("{},{}".format(username, samlId))
+    out_j = get_json_from_response(r)
+    # pprint(out_j)
+    try:
+        externalIdentities = out_j["data"]["organization"]["samlIdentityProvider"]["externalIdentities"]
+        for node in externalIdentities["edges"]:
+            username = node["node"]["user"]["login"]
+            samlId = node["node"]["samlIdentity"]["nameId"]
+            print("{},{}".format(username, samlId))
+    except KeyError as e:
+        raise Exception(f"GraphQL response did not contain expected key: {e}")
+    try:
+        variables["endCursor"] = externalIdentities['pageInfo']['endCursor']
+    except KeyError:
+        variables["endCursor"] = None
+    try:
+        hasNextPage = externalIdentities['pageInfo']['hasNextPage']
+    except KeyError:
+        hasNextPage = False
