@@ -1,5 +1,8 @@
 #!/usr/bin/Rscript
-
+#
+# Included as an example of R with GraphQL, might not be applicable outside of STAT 447
+# without modifications.
+#
 library(ghql)
 library(jsonlite)
 
