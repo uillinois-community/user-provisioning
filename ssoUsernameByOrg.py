@@ -14,6 +14,7 @@ import requests
 import json
 import argparse
 import os
+import sys
 
 from pprint import pprint
 from dotenv import load_dotenv
@@ -119,6 +120,7 @@ headers = {
     'accept-encoding': 'gzip',
 }
 
+badNodeList = []
 hasNextPage = True
 while hasNextPage:
     r = requests.post('https://api.github.com/graphql',
@@ -128,9 +130,29 @@ while hasNextPage:
     try:
         externalIdentities = out_j["data"]["organization"]["samlIdentityProvider"]["externalIdentities"]
         for node in externalIdentities["edges"]:
-            username = node["node"]["user"]["login"]
-            samlId = node["node"]["samlIdentity"]["nameId"]
-            print("{},{}".format(username, samlId))
+            goodNode = True
+            try:
+                username = node["node"]["user"]["login"]
+            except:
+                goodNode = False
+                username = None
+            try:
+                samlId = node["node"]["samlIdentity"]["nameId"]
+            except:
+                goodNode = False
+                samlId = None
+            if username is None:
+                username = ''
+                print("!!! Warning: Could not read GitHub username from node", file=sys.stderr)
+            if samlId is None:
+                samlId = ''
+                print("!!! Warning: Could not read SAML identity from node", file=sys.stderr)
+            if goodNode:
+                print("{},{}".format(username, samlId))
+            else:
+                badNodeString = "{},{}".format(username, samlId)
+                badNodeList.append(badNodeString)
+                print("!!! Bad node was: {}".format(badNodeString), file=sys.stderr)
     except KeyError as e:
         raise Exception(f"GraphQL response did not contain expected key: {e}")
     try:
@@ -141,3 +163,9 @@ while hasNextPage:
         hasNextPage = externalIdentities['pageInfo']['hasNextPage']
     except KeyError:
         hasNextPage = False
+
+if len(badNodeList) > 0:
+    print("\nWarning: One or more user nodes had errors. See standard error output.", file=sys.stderr)
+    print("The problem nodes will be repeated below:", file=sys.stderr)
+for badNodeItem in badNodeList:
+    print(badNodeItem, file=sys.stderr)
