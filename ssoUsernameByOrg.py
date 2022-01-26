@@ -14,6 +14,7 @@ import requests
 import json
 import argparse
 import os
+import sys
 
 from pprint import pprint
 from dotenv import load_dotenv
@@ -119,6 +120,13 @@ headers = {
     'accept-encoding': 'gzip',
 }
 
+# Some user nodes may come back from the GraphQL query in an incomplete state
+# (accurately reflecting how GitHub is storing it). We'll treat those as a
+# special case (print to stderr instead). Those users may need to fix issues
+# with their GitHub accounts before the SAML identity resolution will work for
+# the org.
+invalidNodeList = []
+
 hasNextPage = True
 while hasNextPage:
     r = requests.post('https://api.github.com/graphql',
@@ -128,9 +136,34 @@ while hasNextPage:
     try:
         externalIdentities = out_j["data"]["organization"]["samlIdentityProvider"]["externalIdentities"]
         for node in externalIdentities["edges"]:
-            username = node["node"]["user"]["login"]
-            samlId = node["node"]["samlIdentity"]["nameId"]
-            print("{},{}".format(username, samlId))
+            # In rare cases, individual user nodes are returned with
+            # incomplete data. We warn when that happens but don't pollute the
+            # CSV output on stdout with the problematic items.
+            nodeIsValid = True
+            try:
+                username = node["node"]["user"]["login"]
+            except:
+                nodeIsValid = False
+                username = None
+            try:
+                samlId = node["node"]["samlIdentity"]["nameId"]
+            except:
+                nodeIsValid = False
+                samlId = None
+            if username is None:
+                username = ''
+                print("!!! Warning: Could not read GitHub username from node", file=sys.stderr)
+            if samlId is None:
+                samlId = ''
+                print("!!! Warning: Could not read SAML identity from node", file=sys.stderr)
+            if nodeIsValid:
+                # Print valid nodes to stdout.
+                print("{},{}".format(username, samlId))
+            else:
+                # Print invalid nodes to stderr.
+                invalidNodeString = "{},{}".format(username, samlId)
+                invalidNodeList.append(invalidNodeString)
+                print("!!! Bad node was: {}".format(invalidNodeString), file=sys.stderr)
     except KeyError as e:
         raise Exception(f"GraphQL response did not contain expected key: {e}")
     try:
@@ -141,3 +174,9 @@ while hasNextPage:
         hasNextPage = externalIdentities['pageInfo']['hasNextPage']
     except KeyError:
         hasNextPage = False
+
+if len(invalidNodeList) > 0:
+    print("\nWarning: One or more user nodes had errors. See standard error output.", file=sys.stderr)
+    print("The problem nodes will be repeated below:", file=sys.stderr)
+for invalidNodeItem in invalidNodeList:
+    print(invalidNodeItem, file=sys.stderr)
