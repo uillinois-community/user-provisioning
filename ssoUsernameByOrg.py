@@ -120,11 +120,14 @@ headers = {
     'accept-encoding': 'gzip',
 }
 
-# Some user nodes may come back from the GraphQL query in an incomplete state
-# (accurately reflecting how GitHub is storing it). We'll treat those as a
-# special case (print to stderr instead). Those users may need to fix issues
-# with their GitHub accounts before the SAML identity resolution will work for
-# the org.
+# Some user nodes may come back from the GraphQL query in an incomplete state.
+# This can happen if a user goes through SSO linking steps only partially.
+# We'll make a note of the invalid nodes in a temporary list and treat them as
+# a special case (print to stderr instead of stdout). Those users may need to
+# fix issues with their GitHub accounts or retry joining the org before the
+# SAML identity resolution will work for the org. If you don't want to include
+# the invalid entries in your CSV, you can redirect the stderr stream when you
+# invoke this script in your shell.
 invalidNodeList = []
 
 hasNextPage = True
