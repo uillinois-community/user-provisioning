@@ -153,10 +153,12 @@ while hasNextPage:
             except:
                 nodeIsValid = False
                 samlId = None
-            if username is None:
+            if username in (None, ""):
+                nodeIsValid = False
                 username = ''
                 print("!!! Warning: Could not read GitHub username from node", file=sys.stderr)
-            if samlId is None:
+            if samlId in (None, ""):
+                nodeIsValid = False
                 samlId = ''
                 print("!!! Warning: Could not read SAML identity from node", file=sys.stderr)
             if nodeIsValid:
